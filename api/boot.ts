@@ -8,6 +8,12 @@ import { Paths } from "@contracts/constants";
 
 type Bindings = {
   ASSETS: Fetcher;
+  DATABASE_URL: string;
+  AUTH0_DOMAIN: string;
+  AUTH0_CLIENT_ID: string;
+  AUTH0_CLIENT_SECRET: string;
+  OWNER_UNION_ID: string;
+  NODE_ENV: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -24,7 +30,6 @@ app.use("/api/trpc/*", async (c) => {
 });
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
-// Serve static assets via Cloudflare Pages ASSETS binding
 app.get("*", async (c) => {
   if (c.env.ASSETS) {
     return c.env.ASSETS.fetch(c.req.raw);
@@ -32,4 +37,12 @@ app.get("*", async (c) => {
   return c.notFound();
 });
 
-export default app;
+// Cloudflare Workers entry point — copies env bindings into process.env
+export default {
+  async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
+    // Make Cloudflare env bindings available via process.env
+    (globalThis as any).process ??= { env: {} };
+    Object.assign((globalThis as any).process.env, env);
+    return app.fetch(request, env, ctx);
+  },
+};
