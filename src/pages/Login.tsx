@@ -1,0 +1,60 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Gift } from "lucide-react";
+
+function getOAuthUrl() {
+  const kimiAuthUrl = import.meta.env.VITE_KIMI_AUTH_URL;
+  const appID = import.meta.env.VITE_APP_ID;
+  const redirectUri = `${window.location.origin}/api/oauth/callback`;
+  const state = btoa(redirectUri);
+
+  const url = new URL(`${kimiAuthUrl}/api/oauth/authorize`);
+  url.searchParams.set("client_id", appID);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "profile");
+  url.searchParams.set("state", state);
+
+  return url.toString();
+}
+
+export default function Login() {
+  return (
+    <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <Gift className="h-7 w-7 text-[#C67C5A]" />
+          <span className="font-serif text-2xl font-semibold text-[#3D3632]">Giftly</span>
+        </div>
+        <Card className="bg-white border-[#E8E2DA] shadow-lg">
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="font-serif text-xl text-[#3D3632]">Welcome back</CardTitle>
+            <p className="text-sm text-[#6B6058]">Sign in to create and manage your lists</p>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <Button
+              className="w-full bg-[#C67C5A] hover:bg-[#B56A48] text-white"
+              size="lg"
+              onClick={() => {
+                window.location.href = getOAuthUrl();
+              }}
+            >
+              Sign in with Kimi
+            </Button>
+            <p className="mt-6 text-center text-xs text-[#A39B92]">
+              By signing in, you agree to our{" "}
+              <span className="underline cursor-pointer">Terms of Service</span> and{" "}
+              <span className="underline cursor-pointer">Privacy Policy</span>.
+            </p>
+          </CardContent>
+        </Card>
+        <p className="mt-6 text-center text-sm text-[#6B6058]">
+          Don't have an account?{" "}
+          <span className="text-[#C67C5A] cursor-pointer hover:underline" onClick={() => window.location.href = getOAuthUrl()}>
+            Create one
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+}
