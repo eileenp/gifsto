@@ -1,16 +1,21 @@
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value && process.env.NODE_ENV === "production") {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
+function getVar(name: string): string {
+  const value = typeof process !== "undefined" ? process.env[name] : undefined;
   return value ?? "";
 }
 
+function required(name: string): string {
+  const value = getVar(name);
+  if (!value && getVar("NODE_ENV") === "production") {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 export const env = {
-  clientId: required("AUTH0_CLIENT_ID"),
-  clientSecret: required("AUTH0_CLIENT_SECRET"),
-  auth0Domain: required("AUTH0_DOMAIN"),
-  isProduction: process.env.NODE_ENV === "production",
-  databaseUrl: required("DATABASE_URL"),
-  ownerUnionId: process.env.OWNER_UNION_ID ?? "",
+  get clientId() { return required("AUTH0_CLIENT_ID"); },
+  get clientSecret() { return required("AUTH0_CLIENT_SECRET"); },
+  get auth0Domain() { return required("AUTH0_DOMAIN"); },
+  get isProduction() { return getVar("NODE_ENV") === "production"; },
+  get databaseUrl() { return required("DATABASE_URL"); },
+  get ownerUnionId() { return getVar("OWNER_UNION_ID"); },
 };
