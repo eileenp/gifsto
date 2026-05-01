@@ -3,16 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Gift } from "lucide-react";
 
 function getOAuthUrl() {
-  const kimiAuthUrl = import.meta.env.VITE_KIMI_AUTH_URL;
-  const appID = import.meta.env.VITE_APP_ID;
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
   const state = btoa(redirectUri);
 
-  const url = new URL(`${kimiAuthUrl}/api/oauth/authorize`);
-  url.searchParams.set("client_id", appID);
+  const url = new URL(`https://${domain}/authorize`);
+  url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "profile");
+  url.searchParams.set("scope", "openid profile email");
   url.searchParams.set("state", state);
 
   return url.toString();
@@ -39,7 +39,7 @@ export default function Login() {
                 window.location.href = getOAuthUrl();
               }}
             >
-              Sign in with Kimi
+              Sign in with Auth0
             </Button>
             <p className="mt-6 text-center text-xs text-[#A39B92]">
               By signing in, you agree to our{" "}
