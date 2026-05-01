@@ -14,9 +14,9 @@ export const settingsRouter = createRouter({
     if (!settings) {
       const result = await db.insert(userSettings).values({
         userId: ctx.user.id,
-      });
+      }).returning({ id: userSettings.id });
       return db.query.userSettings.findFirst({
-        where: eq(userSettings.id, Number(result[0].insertId)),
+        where: eq(userSettings.id, result[0].id),
       });
     }
     return settings;
@@ -50,9 +50,9 @@ export const settingsRouter = createRouter({
         const result = await db.insert(userSettings).values({
           userId: ctx.user.id,
           ...updateData,
-        });
+        }).returning({ id: userSettings.id });
         return db.query.userSettings.findFirst({
-          where: eq(userSettings.id, Number(result[0].insertId)),
+          where: eq(userSettings.id, result[0].id),
         });
       }
     }),

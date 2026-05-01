@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { lists, listItems, claims, contributions, listAccess } from "@db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const viewerRouter = createRouter({
   // Get a list by ID for public viewing (requires correct password in input)
@@ -69,8 +69,8 @@ export const viewerRouter = createRouter({
         itemId: input.itemId,
         name: input.name,
         email: input.email,
-      });
-      const insertedId = Number(result[0].insertId);
+      }).returning({ id: claims.id });
+      const insertedId = result[0].id;
 
       // Track access
       const existingAccess = await db.query.listAccess.findFirst({
@@ -136,10 +136,10 @@ export const viewerRouter = createRouter({
         itemId: input.itemId,
         name: input.name,
         email: input.email,
-        amount: sql`${input.amount}`,
+        amount: String(input.amount),
         paid: input.paid,
-      });
-      const insertedId = Number(result[0].insertId);
+      }).returning({ id: contributions.id });
+      const insertedId = result[0].id;
 
       // Track access
       const existingAccess = await db.query.listAccess.findFirst({
@@ -173,7 +173,7 @@ export const viewerRouter = createRouter({
       if (!contrib) throw new Error("Contribution not found");
       await db
         .update(contributions)
-        .set({ amount: sql`${input.amount}`, paid: input.paid })
+        .set({ amount: String(input.amount), paid: input.paid })
         .where(eq(contributions.id, input.contributionId));
       return { success: true };
     }),

@@ -25,9 +25,8 @@ export const listRouter = createRouter({
         zelle: input.zelle || null,
         venmo: input.venmo || null,
         paypal: input.paypal || null,
-      });
-      const insertedId = Number(result[0].insertId);
-      return db.query.lists.findFirst({ where: eq(lists.id, insertedId) });
+      }).returning({ id: lists.id });
+      return db.query.lists.findFirst({ where: eq(lists.id, result[0].id) });
     }),
 
   // Get all lists owned by the current user

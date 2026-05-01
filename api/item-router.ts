@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { listItems, lists } from "@db/schema";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 export const itemRouter = createRouter({
   // Create an item
@@ -34,17 +34,16 @@ export const itemRouter = createRouter({
       const result = await db.insert(listItems).values({
         listId: input.listId,
         name: input.name,
-        price: input.price ? sql`${input.price}` : null,
+        price: input.price ? String(input.price) : null,
         quantity: input.quantity,
         notes: input.notes || null,
         purchaseUrl: input.purchaseUrl || null,
         imageUrl: input.imageUrl || null,
         isGroupGift: input.isGroupGift,
-        targetPrice: input.targetPrice ? sql`${input.targetPrice}` : null,
-      });
-      const insertedId = Number(result[0].insertId);
+        targetPrice: input.targetPrice ? String(input.targetPrice) : null,
+      }).returning({ id: listItems.id });
       return db.query.listItems.findFirst({
-        where: eq(listItems.id, insertedId),
+        where: eq(listItems.id, result[0].id),
         with: { claims: true, contributions: true },
       });
     }),
@@ -78,13 +77,13 @@ export const itemRouter = createRouter({
 
       const updateData: Record<string, unknown> = {};
       if (input.name !== undefined) updateData.name = input.name;
-      if (input.price !== undefined) updateData.price = input.price ? sql`${input.price}` : null;
+      if (input.price !== undefined) updateData.price = input.price ? String(input.price) : null;
       if (input.quantity !== undefined) updateData.quantity = input.quantity;
       if (input.notes !== undefined) updateData.notes = input.notes || null;
       if (input.purchaseUrl !== undefined) updateData.purchaseUrl = input.purchaseUrl || null;
       if (input.imageUrl !== undefined) updateData.imageUrl = input.imageUrl || null;
       if (input.isGroupGift !== undefined) updateData.isGroupGift = input.isGroupGift;
-      if (input.targetPrice !== undefined) updateData.targetPrice = input.targetPrice ? sql`${input.targetPrice}` : null;
+      if (input.targetPrice !== undefined) updateData.targetPrice = input.targetPrice ? String(input.targetPrice) : null;
       if (input.listId !== undefined) updateData.listId = input.listId;
 
       await db.update(listItems).set(updateData).where(eq(listItems.id, input.id));
