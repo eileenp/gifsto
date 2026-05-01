@@ -1,12 +1,11 @@
-
-import { drizzle } from "drizzle-orm/mysql2";
-import { createConnection } from "mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema.js";
 import { eq } from "drizzle-orm";
 
 async function seed() {
-  const client = createConnection(process.env.DATABASE_URL);
-  const db = drizzle(client, { schema, mode: "planetscale" });
+  const client = postgres(process.env.DATABASE_URL!);
+  const db = drizzle(client, { schema });
 
   // Create a demo list
   const listResult = await db.insert(schema.lists).values({
@@ -15,8 +14,8 @@ async function seed() {
     ownerId: 1,
     zelle: "sarah@example.com",
     venmo: "@sarah-venmo",
-  });
-  const listId = Number(listResult[0].insertId);
+  }).returning({ id: schema.lists.id });
+  const listId = listResult[0].id;
 
   // Create items
   const items = [
@@ -64,24 +63,12 @@ async function seed() {
   }
 
   // Add access records
-  await db.insert(schema.listAccess).values({
-    listId,
-    email: "emily@example.com",
-    name: "Emily Johnson",
-  });
-  await db.insert(schema.listAccess).values({
-    listId,
-    email: "mike@example.com",
-    name: "Mike Chen",
-  });
-  await db.insert(schema.listAccess).values({
-    listId,
-    email: "jessica@example.com",
-    name: "Jessica Lee",
-  });
+  await db.insert(schema.listAccess).values({ listId, email: "emily@example.com", name: "Emily Johnson" });
+  await db.insert(schema.listAccess).values({ listId, email: "mike@example.com", name: "Mike Chen" });
+  await db.insert(schema.listAccess).values({ listId, email: "jessica@example.com", name: "Jessica Lee" });
 
   console.log("Seeded list:", listId);
-  client.end();
+  await client.end();
 }
 
 seed().catch(console.error);

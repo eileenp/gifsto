@@ -1,23 +1,24 @@
 import {
-  mysqlTable,
-  mysqlEnum,
+  pgTable,
+  pgEnum,
   serial,
-  bigint,
+  integer,
   varchar,
   text,
-  int,
-  decimal,
+  numeric,
   boolean,
   timestamp,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
 
-export const users = mysqlTable("users", {
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+
+export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   unionId: varchar("unionId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -26,11 +27,11 @@ export const users = mysqlTable("users", {
   lastSignInAt: timestamp("lastSignInAt").defaultNow().notNull(),
 });
 
-export const lists = mysqlTable("lists", {
+export const lists = pgTable("lists", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   password: varchar("password", { length: 255 }).notNull(),
-  ownerId: bigint("ownerId", { mode: "number", unsigned: true }).notNull(),
+  ownerId: integer("ownerId").notNull(),
   zelle: varchar("zelle", { length: 255 }),
   venmo: varchar("venmo", { length: 255 }),
   paypal: varchar("paypal", { length: 255 }),
@@ -38,43 +39,43 @@ export const lists = mysqlTable("lists", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
 });
 
-export const listItems = mysqlTable("list_items", {
+export const listItems = pgTable("list_items", {
   id: serial("id").primaryKey(),
-  listId: bigint("listId", { mode: "number", unsigned: true }).notNull(),
+  listId: integer("listId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }),
-  quantity: int("quantity").notNull().default(1),
+  price: numeric("price", { precision: 10, scale: 2 }),
+  quantity: integer("quantity").notNull().default(1),
   notes: text("notes"),
   purchaseUrl: text("purchaseUrl"),
   imageUrl: text("imageUrl"),
   isGroupGift: boolean("isGroupGift").notNull().default(false),
-  targetPrice: decimal("targetPrice", { precision: 10, scale: 2 }),
+  targetPrice: numeric("targetPrice", { precision: 10, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
 });
 
-export const claims = mysqlTable("claims", {
+export const claims = pgTable("claims", {
   id: serial("id").primaryKey(),
-  itemId: bigint("itemId", { mode: "number", unsigned: true }).notNull(),
+  itemId: integer("itemId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   purchased: boolean("purchased").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const contributions = mysqlTable("contributions", {
+export const contributions = pgTable("contributions", {
   id: serial("id").primaryKey(),
-  itemId: bigint("itemId", { mode: "number", unsigned: true }).notNull(),
+  itemId: integer("itemId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   paid: boolean("paid").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const listAccess = mysqlTable("list_access", {
+export const listAccess = pgTable("list_access", {
   id: serial("id").primaryKey(),
-  listId: bigint("listId", { mode: "number", unsigned: true }).notNull(),
+  listId: integer("listId").notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   name: varchar("name", { length: 255 }),
   saved: boolean("saved").notNull().default(false),
@@ -82,16 +83,16 @@ export const listAccess = mysqlTable("list_access", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const coOwners = mysqlTable("co_owners", {
+export const coOwners = pgTable("co_owners", {
   id: serial("id").primaryKey(),
-  listId: bigint("listId", { mode: "number", unsigned: true }).notNull(),
-  userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+  listId: integer("listId").notNull(),
+  userId: integer("userId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const userSettings = mysqlTable("user_settings", {
+export const userSettings = pgTable("user_settings", {
   id: serial("id").primaryKey(),
-  userId: bigint("userId", { mode: "number", unsigned: true }).notNull().unique(),
+  userId: integer("userId").notNull().unique(),
   notifyClaim: boolean("notifyClaim").notNull().default(true),
   notifyContribution: boolean("notifyContribution").notNull().default(true),
   notifyNewItem: boolean("notifyNewItem").notNull().default(true),
