@@ -80,7 +80,7 @@ export default function ContributionManage() {
     <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <span className="font-serif text-2xl font-semibold text-[#3D3632]">Giftly</span>
+          <span className="font-serif text-2xl font-semibold text-[#3D3632]">Gifsto</span>
         </div>
         <Card className="bg-white border-[#E8E2DA] shadow-lg">
           <CardContent className="p-8">

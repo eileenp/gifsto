@@ -170,7 +170,7 @@ export default function ListView() {
     <div className="min-h-screen bg-[#FDFBF7]">
       <nav className="sticky top-0 z-50 w-full border-b border-[#E8E2DA]/50 bg-[#FDFBF7]/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
-          <Link to="/" className="font-serif text-xl font-semibold text-[#3D3632]">Giftly</Link>
+          <Link to="/" className="font-serif text-xl font-semibold text-[#3D3632]">Gifsto</Link>
         </div>
       </nav>
 

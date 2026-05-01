@@ -154,7 +154,7 @@ export default function Home() {
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <div className="flex items-center gap-2">
               <Gift className="h-5 w-5 text-[#D4A574]" />
-              <span className="font-serif text-lg text-[#FDFBF7]">Giftly</span>
+              <span className="font-serif text-lg text-[#FDFBF7]">Gifsto</span>
             </div>
             <div className="flex flex-wrap justify-center gap-6 text-sm text-[#A39B92]">
               <Link to="/privacy" className="hover:text-[#FDFBF7]">Privacy Policy</Link>
@@ -164,7 +164,7 @@ export default function Home() {
             </div>
           </div>
           <p className="mt-8 text-center text-xs text-[#6B6058]">
-            Giftly. Built for thoughtful gifting.
+            Gifsto. Built for thoughtful gifting.
           </p>
         </div>
       </footer>

@@ -24,7 +24,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2 mb-8">
           <Gift className="h-7 w-7 text-[#C67C5A]" />
-          <span className="font-serif text-2xl font-semibold text-[#3D3632]">Giftly</span>
+          <span className="font-serif text-2xl font-semibold text-[#3D3632]">Gifsto</span>
         </div>
         <Card className="bg-white border-[#E8E2DA] shadow-lg">
           <CardHeader className="text-center pb-2">
