@@ -1,11 +1,11 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 import * as schema from "./schema.js";
 import { eq } from "drizzle-orm";
 
 async function seed() {
-  const client = postgres(process.env.DATABASE_URL!);
-  const db = drizzle(client, { schema });
+  const sql = neon(process.env.DATABASE_URL!);
+  const db = drizzle(sql, { schema });
 
   // Create a demo list
   const listResult = await db.insert(schema.lists).values({
@@ -17,7 +17,6 @@ async function seed() {
   }).returning({ id: schema.lists.id });
   const listId = listResult[0].id;
 
-  // Create items
   const items = [
     { name: "Le Creuset Dutch Oven", price: "350.00", quantity: 1, notes: "In Sage Green or Terracotta color", purchaseUrl: "https://www.lecreuset.com", imageUrl: null, isGroupGift: false },
     { name: "Cashmere Throw Blanket", price: "120.00", quantity: 1, notes: "Soft, cozy, warm beige", purchaseUrl: "https://example.com/blanket", imageUrl: null, isGroupGift: false },
@@ -26,49 +25,29 @@ async function seed() {
   ];
 
   for (const item of items) {
-    await db.insert(schema.listItems).values({
-      listId,
-      ...item,
-    });
+    await db.insert(schema.listItems).values({ listId, ...item });
   }
 
-  // Add a claim to one item
   const itemRows = await db.query.listItems.findMany({ where: eq(schema.listItems.listId, listId) });
-  const claimedItem = itemRows[0];
 
   await db.insert(schema.claims).values({
-    itemId: claimedItem.id,
+    itemId: itemRows[0].id,
     name: "Emily Johnson",
     email: "emily@example.com",
     purchased: false,
   });
 
-  // Add a contribution to group gift
   const groupItem = itemRows.find((i: any) => i.isGroupGift);
   if (groupItem) {
-    await db.insert(schema.contributions).values({
-      itemId: groupItem.id,
-      name: "Mike Chen",
-      email: "mike@example.com",
-      amount: "75.00",
-      paid: true,
-    });
-    await db.insert(schema.contributions).values({
-      itemId: groupItem.id,
-      name: "Jessica Lee",
-      email: "jessica@example.com",
-      amount: "50.00",
-      paid: false,
-    });
+    await db.insert(schema.contributions).values({ itemId: groupItem.id, name: "Mike Chen", email: "mike@example.com", amount: "75.00", paid: true });
+    await db.insert(schema.contributions).values({ itemId: groupItem.id, name: "Jessica Lee", email: "jessica@example.com", amount: "50.00", paid: false });
   }
 
-  // Add access records
   await db.insert(schema.listAccess).values({ listId, email: "emily@example.com", name: "Emily Johnson" });
   await db.insert(schema.listAccess).values({ listId, email: "mike@example.com", name: "Mike Chen" });
   await db.insert(schema.listAccess).values({ listId, email: "jessica@example.com", name: "Jessica Lee" });
 
   console.log("Seeded list:", listId);
-  await client.end();
 }
 
 seed().catch(console.error);

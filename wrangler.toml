@@ -1,0 +1,10 @@
+name = "gifsto"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+# Set secrets via Cloudflare dashboard or:
+# wrangler secret put DATABASE_URL
+# wrangler secret put AUTH0_DOMAIN
+# wrangler secret put AUTH0_CLIENT_ID
+# wrangler secret put AUTH0_CLIENT_SECRET
