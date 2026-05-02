@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { trpc } from '@/providers/trpc'
 import { useAuth } from '@/hooks/useAuth'
@@ -6,14 +6,44 @@ import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { BulkActionBar } from '@/components/BulkActionBar'
+import { isSafeUrl } from '@/lib/utils'
 import {
   Plus,
   Copy,
@@ -23,6 +53,9 @@ import {
   Gift,
   Eye,
   Check,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 
 function getInitials(name: string) {
@@ -51,7 +84,21 @@ export default function Dashboard({ tab = 'lists' }: { tab?: 'lists' | 'items' }
   const [createOpen, setCreateOpen] = useState(false)
   const [copiedId, setCopiedId] = useState<number | null>(null)
 
-  // Create list form state
+  // Master view: multi-select
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  // Tracks whether create-list modal was opened from Move/Copy, and which items to act on
+  const pendingActionRef = useRef<{ action: 'move' | 'copy'; itemIds?: number[] } | null>(null)
+
+  // Per-row actions
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', price: '', quantity: 1, notes: '', listId: 0 })
+  const [deletingItemId, setDeletingItemId] = useState<number | null>(null)
+
+  // Filter + sort
+  const [filterListId, setFilterListId] = useState<string>('all')
+  const [sort, setSort] = useState<'updated' | 'name' | 'list'>('updated')
+
+  // Create list form
   const [newListTitle, setNewListTitle] = useState('')
   const [newListPassword, setNewListPassword] = useState('')
   const [newListZelle, setNewListZelle] = useState('')
@@ -67,14 +114,58 @@ export default function Dashboard({ tab = 'lists' }: { tab?: 'lists' | 'items' }
   })
 
   const createList = trpc.list.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (newList) => {
       utils.list.mine.invalidate()
+      if (pendingActionRef.current && newList) {
+        const ids = pendingActionRef.current.itemIds ?? [...selectedIds]
+        if (pendingActionRef.current.action === 'move') {
+          moveItems.mutate({ itemIds: ids, targetListId: newList.id })
+        } else {
+          copyItems.mutate({ itemIds: ids, targetListId: newList.id })
+        }
+        pendingActionRef.current = null
+      }
       setCreateOpen(false)
       setNewListTitle('')
       setNewListPassword('')
       setNewListZelle('')
       setNewListVenmo('')
       setNewListPaypal('')
+    },
+  })
+
+  const moveItems = trpc.item.move.useMutation({
+    onSuccess: () => {
+      utils.list.allItems.invalidate()
+      setSelectedIds(new Set())
+    },
+  })
+
+  const copyItems = trpc.item.copy.useMutation({
+    onSuccess: () => {
+      utils.list.allItems.invalidate()
+      setSelectedIds(new Set())
+    },
+  })
+
+  const bulkDelete = trpc.item.bulkDelete.useMutation({
+    onSuccess: () => {
+      utils.list.allItems.invalidate()
+      setSelectedIds(new Set())
+    },
+  })
+
+  const itemDelete = trpc.item.delete.useMutation({
+    onSuccess: () => {
+      utils.list.allItems.invalidate()
+      setDeletingItemId(null)
+    },
+  })
+
+  const itemUpdate = trpc.item.update.useMutation({
+    onSuccess: () => {
+      utils.list.allItems.invalidate()
+      setEditingId(null)
     },
   })
 
@@ -117,6 +208,7 @@ export default function Dashboard({ tab = 'lists' }: { tab?: 'lists' | 'items' }
   }
 
   const ownedLists = myLists?.owned || []
+  const ownedListsSlim = ownedLists.map((l) => ({ id: l.id, title: l.title }))
   const hasLists = ownedLists.length > 0
 
   return (
@@ -251,72 +343,429 @@ export default function Dashboard({ tab = 'lists' }: { tab?: 'lists' | 'items' }
           </>
         )}
 
-        {activeTab === 'items' && (
-          <>
-            <div className="mb-6">
-              <h2 className="font-serif text-2xl font-semibold text-[#3D3632]">All my items</h2>
-              <p className="mt-1 text-sm text-[#6B6058]">
-                {allItems?.length || 0} items across {myLists?.owned?.length || 0} lists
-              </p>
-            </div>
+        {activeTab === 'items' && (() => {
+          const items = allItems ?? []
 
-            {!allItems?.length && (
-              <Card className="border-[#E8E2DA] bg-white">
-                <CardContent className="flex flex-col items-center py-16 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#C67C5A]/10">
-                    <Eye className="h-8 w-8 text-[#C67C5A]" />
-                  </div>
-                  <h3 className="mt-4 font-serif text-xl font-semibold text-[#3D3632]">No items yet</h3>
-                  <p className="mt-2 text-[#6B6058]">Add items to any of your lists to see them here.</p>
-                  <Button
-                    onClick={() => navigate('/dashboard')}
-                    className="mt-6 bg-[#C67C5A] text-white hover:bg-[#B56A48]"
-                  >
-                    Go to my lists
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+          const filtered = filterListId === 'all'
+            ? items
+            : items.filter((i) => i.listId === Number(filterListId))
 
-            {!!allItems?.length && (
-              <div className="grid gap-3">
-                {allItems.map((item) => (
-                  <Card key={item.id} className="border-[#E8E2DA] bg-white">
-                    <CardContent className="flex items-center gap-4 p-4">
-                      <div className="h-14 w-14 rounded-lg bg-[#F5F1EC] flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <Gift className="h-6 w-6 text-[#A39B92]" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-[#3D3632] truncate">{item.name}</p>
-                        <p className="text-sm text-[#6B6058]">
-                          {item.price ? `$${item.price}` : 'No price'} · on{" "}
-                          <span
-                            className="text-[#C67C5A] cursor-pointer hover:underline"
-                            onClick={() => navigate(`/lists/${item.listId}`)}
-                          >
-                            {item.list?.title || 'Unknown list'}
-                          </span>
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate(`/lists/${item.listId}`)}
-                        className="text-[#C67C5A] hover:text-[#B56A48] hover:bg-[#C67C5A]/10"
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+          const sorted = [...filtered].sort((a, b) => {
+            if (sort === 'name') return a.name.localeCompare(b.name)
+            if (sort === 'list') return (a.list?.title ?? '').localeCompare(b.list?.title ?? '')
+            return +new Date(b.updatedAt) - +new Date(a.updatedAt)
+          })
+
+          const allSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id))
+          const someSelected = items.some((i) => selectedIds.has(i.id)) && !allSelected
+
+          function toggleAll() {
+            if (allSelected) {
+              setSelectedIds(new Set())
+            } else {
+              setSelectedIds(new Set(items.map((i) => i.id)))
+            }
+          }
+
+          function toggleOne(id: number) {
+            setSelectedIds((prev) => {
+              const next = new Set(prev)
+              if (next.has(id)) next.delete(id)
+              else next.add(id)
+              return next
+            })
+          }
+
+          const selectedItems = items.filter((i) => selectedIds.has(i.id))
+          const claimedInSelection = selectedItems
+            .filter((i) => i.claims.some((c) => !c.purchased))
+            .map((i) => ({
+              id: i.id,
+              name: i.name,
+              claimerName: i.claims.find((c) => !c.purchased)?.name ?? null,
+            }))
+
+          function handleMove(targetListId: number) {
+            const moveableIds = selectedItems
+              .filter((i) => !i.claims.some((c) => !c.purchased))
+              .map((i) => i.id)
+            if (moveableIds.length > 0) {
+              moveItems.mutate({ itemIds: moveableIds, targetListId })
+            } else {
+              setSelectedIds(new Set())
+            }
+          }
+
+          function startEdit(item: typeof items[0]) {
+            setEditForm({
+              name: item.name,
+              price: item.price ?? '',
+              quantity: item.quantity,
+              notes: item.notes ?? '',
+              listId: item.listId,
+            })
+            setEditingId(item.id)
+          }
+
+          function saveEdit() {
+            if (!editingId || !editForm.name.trim()) return
+            itemUpdate.mutate({
+              id: editingId,
+              name: editForm.name.trim(),
+              price: editForm.price ? Number(editForm.price) : undefined,
+              quantity: editForm.quantity,
+              notes: editForm.notes,
+              listId: editForm.listId,
+            })
+          }
+
+          return (
+            <>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="font-serif text-2xl font-semibold text-[#3D3632]">All my items</h2>
+                  <p className="mt-1 text-sm text-[#6B6058]">
+                    {items.length} item{items.length !== 1 ? 's' : ''} across {ownedListsSlim.length} list{ownedListsSlim.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
               </div>
-            )}
-          </>
-        )}
+
+              {!items.length && (
+                <Card className="border-[#E8E2DA] bg-white">
+                  <CardContent className="flex flex-col items-center py-16 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#C67C5A]/10">
+                      <Eye className="h-8 w-8 text-[#C67C5A]" />
+                    </div>
+                    <h3 className="mt-4 font-serif text-xl font-semibold text-[#3D3632]">No items yet</h3>
+                    <p className="mt-2 text-[#6B6058]">Add items to any of your lists to see them here.</p>
+                    <Button
+                      onClick={() => navigate('/dashboard')}
+                      className="mt-6 bg-[#C67C5A] text-white hover:bg-[#B56A48]"
+                    >
+                      Go to my lists
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!!items.length && (
+                <>
+                  {/* Filter + sort controls */}
+                  <div className="mb-4 flex items-center gap-3">
+                    <Select value={filterListId} onValueChange={setFilterListId}>
+                      <SelectTrigger className="w-[180px] border-[#E8E2DA] bg-white text-sm h-9">
+                        <SelectValue placeholder="All lists" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All lists</SelectItem>
+                        {ownedListsSlim.map((l) => (
+                          <SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+                      <SelectTrigger className="w-[160px] border-[#E8E2DA] bg-white text-sm h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="updated">Last updated</SelectItem>
+                        <SelectItem value="name">Name A→Z</SelectItem>
+                        <SelectItem value="list">List name</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    {/* Select all row */}
+                    <div className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-[#6B6058]">
+                      <Checkbox
+                        id="select-all"
+                        checked={allSelected}
+                        data-state={someSelected ? 'indeterminate' : allSelected ? 'checked' : 'unchecked'}
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all items"
+                        className="border-[#D4C9BF] data-[state=checked]:bg-[#C67C5A] data-[state=checked]:border-[#C67C5A]"
+                      />
+                      <label htmlFor="select-all" className="cursor-pointer select-none">
+                        {allSelected ? 'Deselect all' : 'Select all'}
+                      </label>
+                    </div>
+
+                    {sorted.map((item) => {
+                      const isSelected = selectedIds.has(item.id)
+                      const activeClaim = item.claims.find((c) => !c.purchased)
+                      const isEditing = editingId === item.id
+                      return (
+                        <Card
+                          key={item.id}
+                          className={`border-[#E8E2DA] bg-white transition-colors ${isSelected ? 'bg-[#FDF6F1] border-[#C67C5A]/30' : 'hover:bg-[#FDFAF7]'}`}
+                        >
+                          <CardContent className="p-4">
+                            {isEditing ? (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="col-span-2">
+                                    <Label className="text-xs text-[#6B6058]">Name</Label>
+                                    <Input
+                                      value={editForm.name}
+                                      onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                                      className="mt-1 h-8 text-sm border-[#E8E2DA] focus-visible:ring-[#C67C5A]"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-[#6B6058]">Price ($)</Label>
+                                    <Input
+                                      type="number"
+                                      value={editForm.price}
+                                      onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                                      className="mt-1 h-8 text-sm border-[#E8E2DA] focus-visible:ring-[#C67C5A]"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-[#6B6058]">Qty</Label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      value={editForm.quantity}
+                                      onChange={(e) => setEditForm((f) => ({ ...f, quantity: Number(e.target.value) }))}
+                                      className="mt-1 h-8 text-sm border-[#E8E2DA] focus-visible:ring-[#C67C5A]"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <Label className="text-xs text-[#6B6058]">Notes</Label>
+                                    <Input
+                                      value={editForm.notes}
+                                      onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                                      className="mt-1 h-8 text-sm border-[#E8E2DA] focus-visible:ring-[#C67C5A]"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <Label className="text-xs text-[#6B6058]">On list</Label>
+                                    <Select
+                                      value={String(editForm.listId)}
+                                      onValueChange={(v) => setEditForm((f) => ({ ...f, listId: Number(v) }))}
+                                    >
+                                      <SelectTrigger className="mt-1 h-8 text-sm border-[#E8E2DA]">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {ownedListsSlim.map((l) => (
+                                          <SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 pt-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={saveEdit}
+                                    disabled={!editForm.name.trim() || itemUpdate.isPending}
+                                    className="bg-[#C67C5A] text-white hover:bg-[#B56A48] h-8 text-xs"
+                                  >
+                                    {itemUpdate.isPending ? 'Saving…' : 'Save'}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingId(null)}
+                                    className="border-[#E8E2DA] text-[#3D3632] hover:bg-[#F5F1EC] h-8 text-xs"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-4">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleOne(item.id)}
+                                  aria-label={`Select ${item.name}`}
+                                  className="flex-shrink-0 border-[#D4C9BF] data-[state=checked]:bg-[#C67C5A] data-[state=checked]:border-[#C67C5A]"
+                                />
+                                <div className="h-14 w-14 rounded-lg bg-[#F5F1EC] flex items-center justify-center overflow-hidden flex-shrink-0">
+                                  {item.imageUrl && isSafeUrl(item.imageUrl) ? (
+                                    <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <Gift className="h-6 w-6 text-[#A39B92]" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-[#3D3632] truncate">{item.name}</p>
+                                  <p className="text-sm text-[#6B6058]">
+                                    {item.price ? `$${item.price}` : 'No price'} · on{' '}
+                                    <span
+                                      className="text-[#C67C5A] cursor-pointer hover:underline"
+                                      onClick={() => navigate(`/lists/${item.listId}`)}
+                                    >
+                                      {item.list?.title ?? 'Unknown list'}
+                                    </span>
+                                  </p>
+                                  {activeClaim && (
+                                    <p className="text-xs text-[#A39B92] mt-0.5">
+                                      Claimed{activeClaim.name ? ` by ${activeClaim.name}` : ''}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Per-row ⋯ menu */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-[#A39B92] hover:text-[#3D3632] hover:bg-[#F5F1EC]"
+                                      aria-label="Item actions"
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="min-w-[180px]">
+                                    <DropdownMenuItem
+                                      onClick={() => startEdit(item)}
+                                      className="cursor-pointer gap-2"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger className="cursor-pointer gap-2">
+                                        <ArrowRight className="h-4 w-4" />
+                                        Move to…
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuSubContent className="min-w-[180px]">
+                                        {ownedListsSlim
+                                          .filter((l) => l.id !== item.listId)
+                                          .map((l) => (
+                                            <DropdownMenuItem
+                                              key={l.id}
+                                              onClick={() => moveItems.mutate({ itemIds: [item.id], targetListId: l.id })}
+                                              className="cursor-pointer"
+                                            >
+                                              {l.title}
+                                            </DropdownMenuItem>
+                                          ))}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => {
+                                            pendingActionRef.current = { action: 'move', itemIds: [item.id] }
+                                            setCreateOpen(true)
+                                          }}
+                                          className="cursor-pointer text-[#C67C5A] font-medium gap-2"
+                                        >
+                                          <Plus className="h-4 w-4" />
+                                          Create new list
+                                        </DropdownMenuItem>
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger className="cursor-pointer gap-2">
+                                        <Copy className="h-4 w-4" />
+                                        Copy to…
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuSubContent className="min-w-[180px]">
+                                        {ownedListsSlim.map((l) => (
+                                          <DropdownMenuItem
+                                            key={l.id}
+                                            onClick={() => copyItems.mutate({ itemIds: [item.id], targetListId: l.id })}
+                                            className="cursor-pointer"
+                                          >
+                                            {l.title}
+                                          </DropdownMenuItem>
+                                        ))}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => {
+                                            pendingActionRef.current = { action: 'copy', itemIds: [item.id] }
+                                            setCreateOpen(true)
+                                          }}
+                                          className="cursor-pointer text-[#C67C5A] font-medium gap-2"
+                                        >
+                                          <Plus className="h-4 w-4" />
+                                          Create new list
+                                        </DropdownMenuItem>
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => navigate(`/lists/${item.listId}`)}
+                                      className="cursor-pointer gap-2"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                      Open list
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => setDeletingItemId(item.id)}
+                                      className="cursor-pointer text-red-600 focus:text-red-600 gap-2"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Bulk action bar — visible when ≥1 item selected */}
+              {selectedIds.size > 0 && (
+                <BulkActionBar
+                  count={selectedIds.size}
+                  ownedLists={ownedListsSlim}
+                  claimedItems={claimedInSelection}
+                  onMove={handleMove}
+                  onCopy={(targetListId) =>
+                    copyItems.mutate({ itemIds: [...selectedIds], targetListId })
+                  }
+                  onDelete={() =>
+                    bulkDelete.mutate({ itemIds: [...selectedIds] })
+                  }
+                  onCreateNewAndMove={() => {
+                    pendingActionRef.current = { action: 'move' }
+                    setCreateOpen(true)
+                  }}
+                  onCreateNewAndCopy={() => {
+                    pendingActionRef.current = { action: 'copy' }
+                    setCreateOpen(true)
+                  }}
+                  onClear={() => setSelectedIds(new Set())}
+                />
+              )}
+
+              {/* Single-item delete confirmation */}
+              <AlertDialog open={!!deletingItemId} onOpenChange={() => setDeletingItemId(null)}>
+                <AlertDialogContent className="bg-white border-[#E8E2DA]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-serif text-[#3D3632]">Remove this item?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-[#6B6058]">
+                      This removes the item from the list. Anyone who claimed it will be notified.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="border-[#E8E2DA] text-[#3D3632] hover:bg-[#F5F1EC]">
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deletingItemId && itemDelete.mutate({ id: deletingItemId })}
+                      className="bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Remove item
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )
+        })()}
       </main>
 
       {/* Create List Modal */}

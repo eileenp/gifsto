@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router'
+import { useParams, useSearchParams, Link } from 'react-router'
 import { trpc } from '@/providers/trpc'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Gift, Check } from 'lucide-react'
+import { Gift, Check, AlertTriangle } from 'lucide-react'
 
 export default function MarkPurchased() {
   const { claimId } = useParams<{ claimId: string }>()
+  const [searchParams] = useSearchParams()
   const id = Number(claimId)
+  const token = searchParams.get('token') ?? ''
   const [success, setSuccess] = useState(false)
 
   const markPurchased = trpc.viewer.markPurchased.useMutation({
@@ -15,7 +17,26 @@ export default function MarkPurchased() {
   })
 
   function handleMarkPurchased() {
-    markPurchased.mutate({ claimId: id })
+    markPurchased.mutate({ claimId: id, token })
+  }
+
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center px-4">
+        <Card className="w-full max-w-md bg-white border-[#E8E2DA] shadow-lg">
+          <CardContent className="p-8 text-center">
+            <AlertTriangle className="mx-auto h-8 w-8 text-[#D4A574]" />
+            <h2 className="mt-4 font-serif text-xl font-semibold text-[#3D3632]">Invalid link</h2>
+            <p className="mt-2 text-sm text-[#6B6058]">
+              This link is missing a security token. Please use the link exactly as it was provided to you.
+            </p>
+            <Button asChild className="mt-6 bg-[#C67C5A] text-white hover:bg-[#B56A48]">
+              <Link to="/">Go to homepage</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

@@ -84,7 +84,17 @@ export const itemRouter = createRouter({
       if (input.imageUrl !== undefined) updateData.imageUrl = input.imageUrl || null;
       if (input.isGroupGift !== undefined) updateData.isGroupGift = input.isGroupGift;
       if (input.targetPrice !== undefined) updateData.targetPrice = input.targetPrice ? String(input.targetPrice) : null;
-      if (input.listId !== undefined) updateData.listId = input.listId;
+      if (input.listId !== undefined && input.listId !== item.listId) {
+        const targetList = await db.query.lists.findFirst({
+          where: eq(lists.id, input.listId),
+          with: { coOwners: true },
+        });
+        if (!targetList) throw new Error("Target list not found");
+        const isTargetOwner = targetList.ownerId === ctx.user.id;
+        const isTargetCoOwner = targetList.coOwners.some((c) => c.userId === ctx.user.id);
+        if (!isTargetOwner && !isTargetCoOwner) throw new Error("Unauthorized");
+        updateData.listId = input.listId;
+      }
 
       await db.update(listItems).set(updateData).where(eq(listItems.id, input.id));
       return db.query.listItems.findFirst({
@@ -116,14 +126,26 @@ export const itemRouter = createRouter({
     .input(z.object({ itemIds: z.array(z.number()), targetListId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      // Verify ownership of target list
       const targetList = await db.query.lists.findFirst({
         where: eq(lists.id, input.targetListId),
         with: { coOwners: true },
       });
       if (!targetList) throw new Error("Target list not found");
-      const isOwner = targetList.ownerId === ctx.user.id;
-      const isCoOwner = targetList.coOwners.some((c) => c.userId === ctx.user.id);
-      if (!isOwner && !isCoOwner) throw new Error("Unauthorized");
+      const isTargetOwner = targetList.ownerId === ctx.user.id;
+      const isTargetCoOwner = targetList.coOwners.some((c) => c.userId === ctx.user.id);
+      if (!isTargetOwner && !isTargetCoOwner) throw new Error("Unauthorized");
+
+      // Verify ownership of every source item
+      const sourceItems = await db.query.listItems.findMany({
+        where: inArray(listItems.id, input.itemIds),
+        with: { list: { with: { coOwners: true } } },
+      });
+      for (const item of sourceItems) {
+        const isSourceOwner = item.list.ownerId === ctx.user.id;
+        const isSourceCoOwner = item.list.coOwners.some((c) => c.userId === ctx.user.id);
+        if (!isSourceOwner && !isSourceCoOwner) throw new Error("Unauthorized");
+      }
 
       await db
         .update(listItems)
@@ -132,23 +154,49 @@ export const itemRouter = createRouter({
       return { success: true };
     }),
 
+  // Delete multiple items at once
+  bulkDelete: authedQuery
+    .input(z.object({ itemIds: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const items = await db.query.listItems.findMany({
+        where: inArray(listItems.id, input.itemIds),
+        with: { list: { with: { coOwners: true } } },
+      });
+      for (const item of items) {
+        const isOwner = item.list.ownerId === ctx.user.id;
+        const isCoOwner = item.list.coOwners.some((c) => c.userId === ctx.user.id);
+        if (!isOwner && !isCoOwner) throw new Error("Unauthorized");
+      }
+      await db.delete(listItems).where(inArray(listItems.id, input.itemIds));
+      return { success: true };
+    }),
+
   // Copy multiple items to another list
   copy: authedQuery
     .input(z.object({ itemIds: z.array(z.number()), targetListId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      // Verify ownership of target list
       const targetList = await db.query.lists.findFirst({
         where: eq(lists.id, input.targetListId),
         with: { coOwners: true },
       });
       if (!targetList) throw new Error("Target list not found");
-      const isOwner = targetList.ownerId === ctx.user.id;
-      const isCoOwner = targetList.coOwners.some((c) => c.userId === ctx.user.id);
-      if (!isOwner && !isCoOwner) throw new Error("Unauthorized");
+      const isTargetOwner = targetList.ownerId === ctx.user.id;
+      const isTargetCoOwner = targetList.coOwners.some((c) => c.userId === ctx.user.id);
+      if (!isTargetOwner && !isTargetCoOwner) throw new Error("Unauthorized");
 
+      // Verify ownership of every source item
       const items = await db.query.listItems.findMany({
         where: inArray(listItems.id, input.itemIds),
+        with: { list: { with: { coOwners: true } } },
       });
+      for (const item of items) {
+        const isSourceOwner = item.list.ownerId === ctx.user.id;
+        const isSourceCoOwner = item.list.coOwners.some((c) => c.userId === ctx.user.id);
+        if (!isSourceOwner && !isSourceCoOwner) throw new Error("Unauthorized");
+      }
 
       for (const item of items) {
         await db.insert(listItems).values({

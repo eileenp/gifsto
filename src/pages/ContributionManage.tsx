@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router'
+import { useParams, useSearchParams, Link } from 'react-router'
 import { trpc } from '@/providers/trpc'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent } from '@/components/ui/card'
-import { Gift, Check, Trash2 } from 'lucide-react'
+import { Gift, Check, Trash2, AlertTriangle } from 'lucide-react'
 
 export default function ContributionManage() {
   const { contributionId } = useParams<{ contributionId: string }>()
+  const [searchParams] = useSearchParams()
   const id = Number(contributionId)
+  const token = searchParams.get('token') ?? ''
   const [success, setSuccess] = useState(false)
   const [deleted, setDeleted] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -29,13 +31,33 @@ export default function ContributionManage() {
     if (!amount) return
     updateContribution.mutate({
       contributionId: id,
+      token,
       amount: parseFloat(amount),
       paid: hasPaid,
     })
   }
 
   function handleDelete() {
-    deleteContribution.mutate({ contributionId: id })
+    deleteContribution.mutate({ contributionId: id, token })
+  }
+
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center px-4">
+        <Card className="w-full max-w-md bg-white border-[#E8E2DA] shadow-lg">
+          <CardContent className="p-8 text-center">
+            <AlertTriangle className="mx-auto h-8 w-8 text-[#D4A574]" />
+            <h2 className="mt-4 font-serif text-xl font-semibold text-[#3D3632]">Invalid link</h2>
+            <p className="mt-2 text-sm text-[#6B6058]">
+              This link is missing a security token. Please use the link exactly as it was provided to you.
+            </p>
+            <Button asChild className="mt-6 bg-[#C67C5A] text-white hover:bg-[#B56A48]">
+              <Link to="/">Go to homepage</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (success) {

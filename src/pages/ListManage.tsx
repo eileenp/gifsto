@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { trpc } from '@/providers/trpc'
+import { isSafeUrl } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
@@ -339,7 +340,7 @@ export default function ListManage() {
                 <CardContent className="p-5">
                   <div className="flex gap-4">
                     <div className="h-20 w-20 rounded-lg bg-[#F5F1EC] flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {item.imageUrl ? (
+                      {item.imageUrl && isSafeUrl(item.imageUrl) ? (
                         <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
                       ) : (
                         <Gift className="h-8 w-8 text-[#A39B92]" />

@@ -60,6 +60,7 @@ export const claims = pgTable("claims", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   purchased: boolean("purchased").notNull().default(false),
+  token: varchar("token", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -70,6 +71,7 @@ export const contributions = pgTable("contributions", {
   email: varchar("email", { length: 320 }).notNull(),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   paid: boolean("paid").notNull().default(false),
+  token: varchar("token", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

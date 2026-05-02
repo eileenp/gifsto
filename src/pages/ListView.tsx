@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router'
 import { trpc } from '@/providers/trpc'
+import { isSafeUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -28,6 +29,8 @@ export default function ListView() {
   const [contributeOpen, setContributeOpen] = useState(false)
   const [claimSuccess, setClaimSuccess] = useState(false)
   const [contributeSuccess, setContributeSuccess] = useState(false)
+  const [claimResult, setClaimResult] = useState<{ id: number; token: string | null } | null>(null)
+  const [contributeResult, setContributeResult] = useState<{ id: number; token: string | null } | null>(null)
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [showClaimed, setShowClaimed] = useState(false)
 
@@ -55,14 +58,16 @@ export default function ListView() {
   )
 
   const claimItem = trpc.viewer.claim.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       setClaimSuccess(true)
+      if (data) setClaimResult({ id: data.id, token: data.token ?? null })
     },
   })
 
   const contributeItem = trpc.viewer.contribute.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       setContributeSuccess(true)
+      if (data) setContributeResult({ id: data.id, token: data.token ?? null })
     },
   })
 
@@ -223,7 +228,7 @@ export default function ListView() {
                 <CardContent className="p-5">
                   <div className="flex gap-4">
                     <div className="h-24 w-24 rounded-lg bg-[#F5F1EC] flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {item.imageUrl ? (
+                      {item.imageUrl && isSafeUrl(item.imageUrl) ? (
                         <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
                       ) : (
                         <Gift className="h-8 w-8 text-[#A39B92]" />
@@ -237,7 +242,7 @@ export default function ListView() {
                             {item.price ? `$${item.price}` : 'No price set'}
                           </p>
                         </div>
-                        {item.purchaseUrl && (
+                        {item.purchaseUrl && isSafeUrl(item.purchaseUrl) && (
                           <a
                             href={item.purchaseUrl}
                             target="_blank"
@@ -382,9 +387,27 @@ export default function ListView() {
               <h3 className="mt-4 font-serif text-lg font-semibold text-[#3D3632]">
                 You've claimed {selectedItem?.name}
               </h3>
-              <p className="mt-2 text-sm text-[#6B6058]">
-                A confirmation email was sent with links to manage your claim.
-              </p>
+              {claimResult?.token ? (
+                <div className="mt-3 rounded-lg bg-[#F5F1EC] p-3 text-left text-xs text-[#6B6058]">
+                  <p className="font-medium text-[#3D3632] mb-2">Save these links to manage your claim:</p>
+                  <a
+                    href={`/claim/${claimResult.id}?token=${claimResult.token}`}
+                    className="block text-[#C67C5A] hover:underline mb-1"
+                  >
+                    → Unclaim this gift
+                  </a>
+                  <a
+                    href={`/purchased/${claimResult.id}?token=${claimResult.token}`}
+                    className="block text-[#C67C5A] hover:underline"
+                  >
+                    → Mark as purchased
+                  </a>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-[#6B6058]">
+                  A confirmation email was sent with links to manage your claim.
+                </p>
+              )}
               <Button
                 onClick={() => setClaimOpen(false)}
                 className="mt-4 bg-[#C67C5A] text-white hover:bg-[#B56A48]"
@@ -517,6 +540,17 @@ export default function ListView() {
               <p className="mt-2 text-sm text-[#6B6058]">
                 Thank you for contributing ${amount} toward {selectedItem?.name}.
               </p>
+              {contributeResult?.token && (
+                <div className="mt-3 rounded-lg bg-[#F5F1EC] p-3 text-left text-xs text-[#6B6058]">
+                  <p className="font-medium text-[#3D3632] mb-2">Save this link to manage your contribution:</p>
+                  <a
+                    href={`/contribution/${contributeResult.id}?token=${contributeResult.token}`}
+                    className="block text-[#C67C5A] hover:underline"
+                  >
+                    → Update or delete contribution
+                  </a>
+                </div>
+              )}
               <Button
                 onClick={() => setContributeOpen(false)}
                 className="mt-4 bg-[#C67C5A] text-white hover:bg-[#B56A48]"

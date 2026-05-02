@@ -26,7 +26,6 @@ export const settingsRouter = createRouter({
   update: authedQuery
     .input(
       z.object({
-        name: z.string().min(1).max(255).optional(),
         notifyClaim: z.boolean().optional(),
         notifyContribution: z.boolean().optional(),
         notifyNewItem: z.boolean().optional(),
